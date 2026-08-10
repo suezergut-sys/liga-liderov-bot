@@ -16,3 +16,4 @@
 - Добавлен GitHub Actions quality gate с `pnpm check` и `pnpm build`.
 - Репозиторий подключён к Vercel, а обязательные server-side переменные добавлены в Preview и Production environments.
 - CI и Vercel унифицированы на Node.js 24, совместимом с pnpm 11.16.
+- Vercel deployment проверен на реальном URL: интерфейс, вход организатора и соединение с Supabase работают.

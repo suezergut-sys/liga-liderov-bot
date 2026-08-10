@@ -3,7 +3,7 @@
 - Production branch: `main`
 - Vercel project name: `liga-liderov-bot`
 - Vercel project ID: `prj_pegsiC17pXE3nKg1ZSBbSZ4GVi2s`
-- Production URL: будет назначен после разрешённого merge и первого production deployment
+- Production URL: `https://liga-liderov-bot.vercel.app`
 - Framework: Next.js
 - Node.js: 24.x
 - Build command: `pnpm build` (автоопределение Vercel)
@@ -16,3 +16,5 @@
 - Post-deploy smoke test: вход организатора, загрузка панели семи команд, проверка database health; игровое состояние не изменять без отдельного тестового сеанса
 
 Git integration подключена к `https://github.com/suezergut-sys/liga-liderov-bot`. Preview deployments создаются из pull request; production deployment запускается только из `main` после явно разрешённого merge.
+
+При первичном подключении Vercel автоматически назначил production alias первому deployment из feature-ветки. Production branch в настройках подтверждена как `main`; после разрешённого merge alias должен быть проверен на SHA ветки `main` повторно.
