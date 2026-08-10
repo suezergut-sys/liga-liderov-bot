@@ -23,7 +23,7 @@
 
 ## Локальный запуск
 
-Требуется Node.js 20+ и pnpm.
+Требуется Node.js 24+ и pnpm 11.16+.
 
 ```bash
 pnpm install
