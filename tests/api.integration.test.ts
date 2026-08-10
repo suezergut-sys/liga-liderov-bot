@@ -35,6 +35,19 @@ describe("HTTP API integration", () => {
     expect(snapshot.teams[0]).toMatchObject({ status: "awaiting-decision", currentStageIndex: 0 });
   });
 
+  it("records a delivery failure when a connected team has no bot token", async () => {
+    await gameStore.bindCaptain("team-1", "telegram-user", "telegram-chat");
+
+    const response = await adminAction(jsonRequest("http://localhost/api/admin/action", { type: "start" }));
+    expect(response.status).toBe(200);
+    const snapshot = await response.json();
+
+    expect(snapshot.teams[0].delivery).toMatchObject({
+      status: "failed",
+      error: "Не настроен Telegram-токен team-1",
+    });
+  });
+
   it("rejects malformed and unauthenticated admin commands", async () => {
     const malformed = await adminAction(jsonRequest("http://localhost/api/admin/action", { type: "unknown" }));
     expect(malformed.status).toBe(400);

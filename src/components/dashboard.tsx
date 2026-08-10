@@ -170,8 +170,19 @@ export function Dashboard() {
                 <div><dt>Капитан</dt><dd>{team.captainTelegramUserId ? "Подключён" : "Не подключён"}</dd></div>
                 <div><dt>Решение</dt><dd>{team.selectedChoiceId ?? "—"}</dd></div>
                 <div><dt>Файл</dt><dd>{team.currentFileName ?? "—"}</dd></div>
-                <div><dt>Доставка</dt><dd>{team.delivery.status === "failed" ? "Ошибка" : team.delivery.status === "sent" ? "Доставлено" : "—"}</dd></div>
+                <div>
+                  <dt>Доставка</dt>
+                  <dd title={team.delivery.error}>
+                    {team.delivery.status === "failed" ? `Ошибка: ${team.delivery.error ?? "неизвестная ошибка"}` : team.delivery.status === "sent" ? "Доставлено" : "—"}
+                  </dd>
+                </div>
               </dl>
+
+              {snapshot.game.status === "running" && team.captainChatId && (
+                <button disabled={busy} onClick={() => action({ type: "resend", teamId: team.id })}>
+                  Повторить отправку этапа
+                </button>
+              )}
 
               {stage && team.status !== "ready" && team.status !== "completed" && (
                 <div className="override">
