@@ -24,9 +24,15 @@ describe("HTTP API integration", () => {
   });
 
   it("starts the game and exposes the same state on the dashboard", async () => {
-    const actionResponse = await adminAction(jsonRequest("http://localhost/api/admin/action", { type: "start" }));
+    const actionResponse = await adminAction(
+      jsonRequest("http://localhost/api/admin/action", { type: "start", durationSeconds: 180 }),
+    );
     expect(actionResponse.status).toBe(200);
-    expect((await actionResponse.json()).game).toMatchObject({ status: "running", currentStageIndex: 0 });
+    expect((await actionResponse.json()).game).toMatchObject({
+      status: "running",
+      currentStageIndex: 0,
+      durationSeconds: 180,
+    });
 
     const dashboardResponse = await dashboard(new NextRequest("http://localhost/api/dashboard"));
     expect(dashboardResponse.status).toBe(200);
@@ -51,6 +57,10 @@ describe("HTTP API integration", () => {
   it("rejects malformed and unauthenticated admin commands", async () => {
     const malformed = await adminAction(jsonRequest("http://localhost/api/admin/action", { type: "unknown" }));
     expect(malformed.status).toBe(400);
+    const invalidDuration = await adminAction(
+      jsonRequest("http://localhost/api/admin/action", { type: "start", durationSeconds: 59 }),
+    );
+    expect(invalidDuration.status).toBe(400);
 
     process.env.ADMIN_PASSWORD = "configured";
     const unauthenticated = await adminAction(jsonRequest("http://localhost/api/admin/action", { type: "start" }));

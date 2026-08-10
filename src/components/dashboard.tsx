@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameSnapshot, TeamState } from "@/lib/domain/types";
 import { getScenarioStage } from "@/lib/scenario";
 
@@ -14,9 +14,8 @@ const statusLabels: Record<TeamState["status"], string> = {
   completed: "Игра завершена",
 };
 
-function formatCountdown(deadlineAt: string | undefined, now: number) {
-  if (!deadlineAt) return "10:00";
-  const remaining = Math.max(0, new Date(deadlineAt).getTime() - now);
+function formatCountdown(deadlineAt: string | undefined, now: number, durationSeconds: number) {
+  const remaining = deadlineAt ? Math.max(0, new Date(deadlineAt).getTime() - now) : durationSeconds * 1000;
   const minutes = Math.floor(remaining / 60000);
   const seconds = Math.floor((remaining % 60000) / 1000);
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
@@ -29,6 +28,8 @@ export function Dashboard() {
   const [password, setPassword] = useState("");
   const [needsLogin, setNeedsLogin] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [stageDurationMinutes, setStageDurationMinutes] = useState(10);
+  const durationInitialized = useRef(false);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/dashboard", { cache: "no-store" });
@@ -54,6 +55,12 @@ export function Dashboard() {
       window.clearInterval(clock);
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!snapshot || durationInitialized.current) return;
+    setStageDurationMinutes(snapshot.game.durationSeconds / 60);
+    durationInitialized.current = true;
+  }, [snapshot]);
 
   async function action(body: Record<string, unknown>) {
     setBusy(true);
@@ -91,8 +98,9 @@ export function Dashboard() {
 
   const readyCount = snapshot?.teams.filter((team) => team.status === "ready" || team.status === "completed").length ?? 0;
   const effectiveNow = now || new Date(snapshot?.serverNow ?? 0).getTime();
-  const timer = formatCountdown(snapshot?.game.deadlineAt, effectiveNow);
+  const timer = formatCountdown(snapshot?.game.deadlineAt, effectiveNow, snapshot?.game.durationSeconds ?? 600);
   const timerExpired = Boolean(snapshot?.game.deadlineAt && new Date(snapshot.game.deadlineAt).getTime() <= effectiveNow);
+  const durationIsValid = Number.isInteger(stageDurationMinutes) && stageDurationMinutes >= 1 && stageDurationMinutes <= 1440;
 
   const stageLabel = useMemo(() => {
     if (!snapshot || snapshot.game.currentStageIndex < 0) return "Игра не начата";
@@ -153,10 +161,25 @@ export function Dashboard() {
           <span className="label">Осталось времени</span>
           <strong>{timer}</strong>
         </div>
+        <div className="duration-control">
+          <label className="label" htmlFor="stage-duration">Следующий этап, минут</label>
+          <input
+            id="stage-duration"
+            type="number"
+            min="1"
+            max="1440"
+            step="1"
+            value={stageDurationMinutes}
+            onChange={(event) => setStageDurationMinutes(Number(event.target.value))}
+          />
+        </div>
         <button
           className="primary"
-          disabled={busy || snapshot.game.status === "completed"}
-          onClick={() => action({ type: snapshot.game.status === "waiting" ? "start" : "advance" })}
+          disabled={busy || snapshot.game.status === "completed" || !durationIsValid}
+          onClick={() => action({
+            type: snapshot.game.status === "waiting" ? "start" : "advance",
+            durationSeconds: stageDurationMinutes * 60,
+          })}
         >
           {snapshot.game.status === "waiting" ? "Открыть первый этап" : "Завершить этап и перейти дальше"}
         </button>
@@ -179,17 +202,16 @@ export function Dashboard() {
                   <article className={`team-card ${team.color}`} key={team.id}>
               <div className="team-head">
                 <div>
-                  <span className="team-number">{String(team.number).padStart(2, "0")}</span>
                   <h2>{team.name}</h2>
                 </div>
                 <span className={`status ${team.status}`}>{statusLabels[team.status]}</span>
               </div>
 
               <dl>
-                <div><dt>Капитан</dt><dd>{team.captainTelegramUserId ? "Подключён" : "Не подключён"}</dd></div>
-                <div><dt>Решение</dt><dd>{team.selectedChoiceId ?? "—"}</dd></div>
-                <div><dt>Файл</dt><dd>{team.currentFileName ?? "—"}</dd></div>
-                <div>
+                <div className={team.captainTelegramUserId ? "complete" : undefined}><dt>Капитан</dt><dd>{team.captainTelegramUserId ? "Подключён" : "Не подключён"}</dd></div>
+                <div className={team.selectedChoiceId ? "complete" : undefined}><dt>Решение</dt><dd>{team.selectedChoiceId ?? "—"}</dd></div>
+                <div className={team.currentFileName ? "complete" : undefined}><dt>Файл</dt><dd>{team.currentFileName ?? "—"}</dd></div>
+                <div className={team.delivery.status === "sent" ? "complete" : undefined}>
                   <dt>Доставка</dt>
                   <dd title={team.delivery.error}>
                     {team.delivery.status === "failed" ? `Ошибка: ${team.delivery.error ?? "неизвестная ошибка"}` : team.delivery.status === "sent" ? "Доставлено" : "—"}

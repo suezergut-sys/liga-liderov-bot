@@ -31,11 +31,12 @@ h2 { margin-bottom: 0; font-size: 18px; letter-spacing: -.02em; }
 .demo-badge { border: 1px solid #e2b763; border-radius: 999px; padding: 7px 11px; color: #7c5710; background: #fff7dd; font-size: 12px; font-weight: 800; text-transform: uppercase; }
 
 .control-panel, .audit-panel { max-width: 1400px; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); box-shadow: 0 12px 40px rgba(25, 38, 67, .06); }
-.control-panel { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)) minmax(220px, 1.25fr); align-items: stretch; margin-bottom: 18px; overflow: hidden; }
+.control-panel { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)) minmax(220px, 1.25fr); align-items: stretch; margin-bottom: 18px; overflow: hidden; }
 .control-panel > div { padding: 16px 18px; border-right: 1px solid var(--line); }
 .control-panel strong { font-size: 18px; }
 .timer strong { font-variant-numeric: tabular-nums; }
 .timer.expired strong { color: var(--red); }
+.duration-control input { width: 100%; max-width: 110px; border: 1px solid #bec7d6; border-radius: 8px; padding: 7px 9px; color: var(--ink); background: white; font-weight: 800; }
 button { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; color: var(--ink); background: white; font-weight: 700; }
 button:hover:not(:disabled) { border-color: #aeb8ca; background: #f8f9fc; }
 .primary { border: 0; border-radius: 0; padding: 18px 26px; color: white; background: var(--navy); }
@@ -54,12 +55,13 @@ button:hover:not(:disabled) { border-color: #aeb8ca; background: #f8f9fc; }
 .team-card::before { position: absolute; inset: 0 auto 0 0; width: 5px; content: ""; background: var(--blue); }
 .team-card.red::before { background: var(--red); }
 .team-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.team-number { display: block; color: var(--muted); font-size: 12px; font-weight: 900; letter-spacing: .12em; }
 .status { border-radius: 999px; padding: 5px 8px; color: #5d667c; background: #eef1f6; font-size: 11px; font-weight: 800; white-space: nowrap; }
 .status.ready, .status.completed { color: #116440; background: #dff5e9; }
 .status.awaiting-file { color: #82580b; background: #fff1c9; }
 dl { display: grid; grid-template-columns: 1fr 1fr; margin: 12px 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 dl div { min-width: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 8px 10px; }
+dl div.complete { background: #e5f6ea; }
+dl div.complete dd { color: #116440; }
 dt { margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; }
 dd { overflow: hidden; margin: 0; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .override, .demo-tools { border-radius: 10px; padding: 10px; background: #f5f7fa; }

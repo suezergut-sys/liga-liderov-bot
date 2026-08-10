@@ -186,13 +186,17 @@ async function validateChoice(
   return stage;
 }
 
-async function openStage(sql: Queryable, sessionId: string, stageIndex: number) {
+async function openStage(sql: Queryable, sessionId: string, stageIndex: number, durationSeconds: number) {
+  if (!Number.isInteger(durationSeconds) || durationSeconds < 60 || durationSeconds > 86_400) {
+    throw new Error("Длительность этапа должна быть от 1 до 1440 минут");
+  }
   const openedAt = new Date();
-  const deadlineAt = new Date(openedAt.getTime() + DEFAULT_DURATION_SECONDS * 1000);
+  const deadlineAt = new Date(openedAt.getTime() + durationSeconds * 1000);
   await sql`
     update app.game_sessions
     set status = 'running',
         current_stage_index = ${stageIndex},
+        duration_seconds = ${durationSeconds},
         stage_opened_at = ${openedAt},
         deadline_at = ${deadlineAt},
         completed_at = null
@@ -346,16 +350,16 @@ export class PostgresGameStore {
     return getScenarioStage(team, team.currentStageIndex);
   }
 
-  async startGame() {
+  async startGame(durationSeconds = DEFAULT_DURATION_SECONDS) {
     await this.sql.begin(async (tx) => {
       const session = await currentSession(tx, true);
       if (session.status !== "waiting") throw new Error("Игра уже запущена");
-      await openStage(tx, session.id, 0);
-      await addEvent(tx, session.id, "organizer", "stage.opened", undefined, { stageIndex: 0 });
+      await openStage(tx, session.id, 0, durationSeconds);
+      await addEvent(tx, session.id, "organizer", "stage.opened", undefined, { stageIndex: 0, durationSeconds });
     });
   }
 
-  async advanceGame() {
+  async advanceGame(durationSeconds = DEFAULT_DURATION_SECONDS) {
     await this.sql.begin(async (tx) => {
       const session = await currentSession(tx, true);
       if (session.status !== "running") throw new Error("Игра ещё не запущена");
@@ -389,8 +393,8 @@ export class PostgresGameStore {
         return;
       }
 
-      await openStage(tx, session.id, nextStage);
-      await addEvent(tx, session.id, "organizer", "stage.opened", undefined, { stageIndex: nextStage });
+      await openStage(tx, session.id, nextStage, durationSeconds);
+      await addEvent(tx, session.id, "organizer", "stage.opened", undefined, { stageIndex: nextStage, durationSeconds });
     });
   }
 

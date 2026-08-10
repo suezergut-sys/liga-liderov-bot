@@ -8,8 +8,8 @@ import { gameStore } from "@/lib/store";
 import { sendCurrentStage } from "@/lib/telegram";
 
 const actionSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("start") }),
-  z.object({ type: z.literal("advance") }),
+  z.object({ type: z.literal("start"), durationSeconds: z.number().int().min(60).max(86_400).optional() }),
+  z.object({ type: z.literal("advance"), durationSeconds: z.number().int().min(60).max(86_400).optional() }),
   z.object({ type: z.literal("reset") }),
   z.object({ type: z.literal("force"), teamId: z.string(), choiceId: z.string() }),
   z.object({ type: z.literal("demo-select"), teamId: z.string(), choiceId: z.string() }),
@@ -48,11 +48,11 @@ export async function POST(request: NextRequest) {
     const action = parsed.data;
     switch (action.type) {
       case "start":
-        await gameStore.startGame();
+        await gameStore.startGame(action.durationSeconds);
         await deliver();
         break;
       case "advance":
-        await gameStore.advanceGame();
+        await gameStore.advanceGame(action.durationSeconds);
         if ((await gameStore.snapshot()).game.status === "running") await deliver();
         break;
       case "reset":
