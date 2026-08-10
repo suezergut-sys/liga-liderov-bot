@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GameSnapshot, TeamState } from "@/lib/domain/types";
 import { getScenarioStage } from "@/lib/scenario";
@@ -119,9 +120,19 @@ export function Dashboard() {
   return (
     <main>
       <header className="topbar">
-        <div>
-          <span className="eyebrow">Финансовая деловая игра</span>
-          <h1>Лига лидеров</h1>
+        <div className="hero-heading">
+          <Image
+            className="hero-image"
+            src="/images/we-are-in-profit.png"
+            alt="Команды финансовой игры — Мы в плюсе"
+            width={156}
+            height={156}
+            preload
+          />
+          <div>
+            <span className="eyebrow">Финансовая деловая игра</span>
+            <h1>Лига лидеров</h1>
+          </div>
         </div>
         <div className="topbar-actions">
           {snapshot.demoMode && <span className="demo-badge">Demo mode</span>}
@@ -153,11 +164,19 @@ export function Dashboard() {
 
       {error && <div className="error-banner">{error}</div>}
 
-      <section className="team-grid">
-        {snapshot.teams.map((team) => {
-          const stage = team.currentStageIndex >= 0 ? getScenarioStage(team, team.currentStageIndex) : undefined;
+      <section className="team-board">
+        {(["red", "blue"] as const).map((color) => {
+          const teams = snapshot.teams.filter((team) => team.color === color);
           return (
-            <article className={`team-card ${team.color}`} key={team.id}>
+            <section className={`team-column ${color}`} key={color}>
+              <div className="team-column-heading">
+                <span>{color === "red" ? "Красные команды" : "Синие команды"}</span>
+                <strong>{teams.length}</strong>
+              </div>
+              {teams.map((team) => {
+                const stage = team.currentStageIndex >= 0 ? getScenarioStage(team, team.currentStageIndex) : undefined;
+                return (
+                  <article className={`team-card ${team.color}`} key={team.id}>
               <div className="team-head">
                 <div>
                   <span className="team-number">{String(team.number).padStart(2, "0")}</span>
@@ -207,7 +226,10 @@ export function Dashboard() {
                   {team.status === "awaiting-file" && <button onClick={() => action({ type: "demo-file", teamId: team.id })}>Загрузить тестовый Excel</button>}
                 </div>
               )}
-            </article>
+                  </article>
+                );
+              })}
+            </section>
           );
         })}
       </section>
