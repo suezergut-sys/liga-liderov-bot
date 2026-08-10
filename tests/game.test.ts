@@ -8,6 +8,26 @@ describe("MemoryGameStore", () => {
     expect(() => store.advanceGame()).toThrow("Не все команды завершили этап");
   });
 
+  it("uses the organizer duration for each newly opened stage", () => {
+    const store = new MemoryGameStore();
+    store.startGame(3 * 60);
+    expect(store.snapshot().game.durationSeconds).toBe(3 * 60);
+
+    for (let number = 1; number <= 7; number += 1) {
+      store.forceResolve(`team-${number}`, "protect-margin");
+    }
+    store.advanceGame(7 * 60);
+
+    const game = store.snapshot().game;
+    expect(game.durationSeconds).toBe(7 * 60);
+    expect(new Date(game.deadlineAt!).getTime() - new Date(game.stageOpenedAt!).getTime()).toBe(7 * 60 * 1000);
+  });
+
+  it("rejects a duration outside the supported range", () => {
+    const store = new MemoryGameStore();
+    expect(() => store.startGame(59)).toThrow("Длительность этапа должна быть от 1 до 1440 минут");
+  });
+
   it("locks a captain decision after confirmation", () => {
     const store = new MemoryGameStore();
     store.startGame();

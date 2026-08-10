@@ -88,13 +88,13 @@ export class MemoryGameStore {
     return getScenarioStage(team, team.currentStageIndex);
   }
 
-  startGame() {
+  startGame(durationSeconds = DEFAULT_DURATION_SECONDS) {
     if (this.data.game.status !== "waiting") throw new Error("Игра уже запущена");
-    this.openStage(0);
-    addEvent(this.data, "organizer", "stage.opened", undefined, { stageIndex: 0 });
+    this.openStage(0, durationSeconds);
+    addEvent(this.data, "organizer", "stage.opened", undefined, { stageIndex: 0, durationSeconds });
   }
 
-  advanceGame() {
+  advanceGame(durationSeconds = DEFAULT_DURATION_SECONDS) {
     if (this.data.game.status !== "running") throw new Error("Игра ещё не запущена");
     const blockers = this.data.teams.filter((team) => team.status !== "ready");
     if (blockers.length) {
@@ -111,18 +111,21 @@ export class MemoryGameStore {
       return;
     }
 
-    this.openStage(nextStage);
-    addEvent(this.data, "organizer", "stage.opened", undefined, { stageIndex: nextStage });
+    this.openStage(nextStage, durationSeconds);
+    addEvent(this.data, "organizer", "stage.opened", undefined, { stageIndex: nextStage, durationSeconds });
   }
 
-  private openStage(stageIndex: number) {
+  private openStage(stageIndex: number, durationSeconds: number) {
+    if (!Number.isInteger(durationSeconds) || durationSeconds < 60 || durationSeconds > 86_400) {
+      throw new Error("Длительность этапа должна быть от 1 до 1440 минут");
+    }
     const openedAt = new Date();
     this.data.game = {
       status: "running",
       currentStageIndex: stageIndex,
       stageOpenedAt: openedAt.toISOString(),
-      deadlineAt: new Date(openedAt.getTime() + DEFAULT_DURATION_SECONDS * 1000).toISOString(),
-      durationSeconds: DEFAULT_DURATION_SECONDS,
+      deadlineAt: new Date(openedAt.getTime() + durationSeconds * 1000).toISOString(),
+      durationSeconds,
     };
     for (const team of this.data.teams) {
       team.currentStageIndex = stageIndex;
