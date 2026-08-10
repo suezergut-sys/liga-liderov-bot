@@ -41,6 +41,8 @@ pnpm build
 
 GitHub Actions выполняет те же команды для pull request и ветки `main`. Во время статической production-сборки CI получает заведомо нерабочий `DATABASE_URL`; сетевое подключение при build не выполняется, а runtime deployment обязан получить настоящий секрет из Vercel.
 
+Параметры связанного deployment-проекта и production smoke test зафиксированы в `docs/vercel-project-profile.md`.
+
 Живая интеграционная проверка PostgreSQL сбрасывает тестовую игровую сессию до и после сценария. В PowerShell:
 
 ```powershell

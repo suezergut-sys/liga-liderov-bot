@@ -14,3 +14,4 @@
 - Добавлены интеграционные проверки HTTP API: запуск игры, чтение панели, валидация админ-команд и защита Telegram webhook.
 - Production запускается только с `DATABASE_URL` и не откатывается незаметно на временную память.
 - Добавлен GitHub Actions quality gate с `pnpm check` и `pnpm build`.
+- Репозиторий подключён к Vercel, а обязательные server-side переменные добавлены в Preview и Production environments.
