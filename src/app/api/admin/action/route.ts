@@ -24,7 +24,11 @@ async function deliver(teamId?: string) {
   await Promise.all(
     teams.map(async (team) => {
       const bot = getBotConfig(team.botKey);
-      if (!bot?.token || !team.captainChatId) return;
+      if (!team.captainChatId) return;
+      if (!bot?.token) {
+        await gameStore.setDelivery(team.id, "failed", `Не настроен Telegram-токен ${team.botKey}`);
+        return;
+      }
       try {
         await sendCurrentStage(bot, team);
         await gameStore.setDelivery(team.id, "sent");
