@@ -38,7 +38,8 @@ pnpm build
 ## GitHub и production
 
 - Публиковать работу из отдельной ветки через pull request без force push.
-- Не выполнять merge без явного разрешения пользователя.
+- После успешных обязательных проверок самостоятельно выполнять merge готового pull request в `main`, если пользователь явно не запретил merge для конкретной задачи.
+- Не выполнять merge draft pull request, pull request с конфликтами, упавшими обязательными проверками или незакрытым `changes requested`.
 - После merge дождаться Vercel deployment `Ready` и проверить production URL.
 
 ## Критерий готовности
