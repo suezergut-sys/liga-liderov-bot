@@ -12,6 +12,7 @@ const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("advance"), durationSeconds: z.number().int().min(60).max(86_400).optional() }),
   z.object({ type: z.literal("reset") }),
   z.object({ type: z.literal("force"), teamId: z.string(), choiceId: z.string() }),
+  z.object({ type: z.literal("force-complete-without-file"), teamId: z.string() }),
   z.object({ type: z.literal("demo-select"), teamId: z.string(), choiceId: z.string() }),
   z.object({ type: z.literal("demo-confirm"), teamId: z.string() }),
   z.object({ type: z.literal("demo-file"), teamId: z.string() }),
@@ -61,6 +62,9 @@ export async function POST(request: NextRequest) {
       case "force":
         await gameStore.forceResolve(action.teamId, action.choiceId);
         break;
+      case "force-complete-without-file":
+        await gameStore.forceCompleteWithoutFile(action.teamId);
+        break;
       case "demo-select":
         await gameStore.selectChoice(action.teamId, action.choiceId);
         break;
@@ -86,5 +90,5 @@ export async function POST(request: NextRequest) {
 
 export async function availableChoices(teamId: string) {
   const team = await gameStore.getTeam(teamId);
-  return getScenarioStage(team, team.currentStageIndex).choices;
+  return getScenarioStage(team, team.currentStageIndex)?.choices ?? [];
 }

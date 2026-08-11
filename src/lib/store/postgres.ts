@@ -152,7 +152,7 @@ async function historyForSession(sql: Queryable, sessionId: string): Promise<His
       limit 1
     ) f on true
     where d.session_id = ${sessionId}
-    order by d.team_id, d.stage_index
+    order by d.team_id, d.stage_index, d.confirmed_at, d.stage_id
   `);
 }
 
@@ -187,7 +187,7 @@ export async function validateChoice(
   if (!team) throw new Error("Команда не найдена");
 
   const stage = getScenarioStage({ color: team.color, history } as TeamState, stageIndex);
-  if (!stage.choices.some((choice) => choice.id === choiceId)) {
+  if (!stage || !stage.choices.some((choice) => choice.id === choiceId)) {
     throw new Error("Недопустимый вариант");
   }
   return stage;
@@ -222,6 +222,28 @@ async function openStage(sql: Queryable, sessionId: string, stageIndex: number, 
       last_activity_at = excluded.last_activity_at,
       version = app.team_stage_progress.version + 1
   `;
+
+  const teams = rows<Pick<TeamRow, "id" | "color">>(await sql`
+    select id, color from app.teams order by team_number
+  `);
+  const historyRows = await historyForSession(sql, sessionId);
+  for (const team of teams) {
+    const history = historyRows.filter((item) => item.team_id === team.id).map(mapHistory);
+    const stage = getScenarioStage({ color: team.color, history } as TeamState, stageIndex);
+    if (stage && stage.choices.length === 0 && stage.fileRequired) {
+      await sql`
+        update app.team_stage_progress
+        set status = 'awaiting-file', version = version + 1
+        where session_id = ${sessionId} and team_id = ${team.id} and stage_index = ${stageIndex}
+      `;
+    }
+  }
+}
+
+interface FileRow {
+  team_id: string;
+  original_name: string;
+  storage_url: string;
 }
 
 export class PostgresGameStore {
@@ -268,6 +290,14 @@ export class PostgresGameStore {
             where session_id = ${session.id} and stage_index = ${session.current_stage_index}
           `);
       const historyRows = await historyForSession(tx, session.id);
+      const currentFiles = session.current_stage_index < 0
+        ? []
+        : rows<FileRow>(await tx`
+            select distinct on (team_id) team_id, original_name, storage_url
+            from app.file_submissions
+            where session_id = ${session.id} and stage_index = ${session.current_stage_index}
+            order by team_id, version desc
+          `);
       const deliveries = session.current_stage_index < 0
         ? []
         : rows<DeliveryRow>(await tx`
@@ -295,7 +325,7 @@ export class PostgresGameStore {
         teams: teams.map((team): TeamState => {
           const teamProgress = progress.find((item) => item.team_id === team.id);
           const history = historyRows.filter((item) => item.team_id === team.id).map(mapHistory);
-          const currentHistory = history.find((item) => item.stageIndex === session.current_stage_index);
+          const currentFile = currentFiles.find((item) => item.team_id === team.id);
           const delivery = deliveries.find((item) => item.team_id === team.id);
           const status: TeamStatus = session.status === "waiting"
             ? "waiting"
@@ -316,8 +346,8 @@ export class PostgresGameStore {
             selectedChoiceId: teamProgress?.selected_choice_id ?? undefined,
             selectedSource: teamProgress?.selected_source ?? undefined,
             decisionConfirmedAt: iso(teamProgress?.decision_confirmed_at),
-            currentFileName: currentHistory?.fileName,
-            currentFileUrl: currentHistory?.fileUrl,
+            currentFileName: currentFile?.original_name,
+            currentFileUrl: currentFile?.storage_url,
             lastActivityAt: iso(teamProgress?.last_activity_at),
             delivery: delivery
               ? { status: delivery.status, at: iso(delivery.attempted_at), error: delivery.error_code ?? undefined }
@@ -419,7 +449,7 @@ export class PostgresGameStore {
       if (!progress || !["awaiting-decision", "decision-selected"].includes(progress.status)) {
         throw new Error("Решение уже зафиксировано или этап закрыт");
       }
-      await validateChoice(tx, session.id, teamId, session.current_stage_index, choiceId);
+      const stage = await validateChoice(tx, session.id, teamId, session.current_stage_index, choiceId);
       await tx`
         update app.team_stage_progress
         set selected_choice_id = ${choiceId}, selected_source = ${source},
@@ -427,7 +457,10 @@ export class PostgresGameStore {
         where session_id = ${session.id} and team_id = ${teamId}
           and stage_index = ${session.current_stage_index}
       `;
-      await addEvent(tx, session.id, source === "captain" ? "captain" : "organizer", "decision.selected", teamId, { choiceId });
+      await addEvent(tx, session.id, source === "captain" ? "captain" : "organizer", "decision.selected", teamId, {
+        stageId: stage.id,
+        choiceId,
+      });
     });
   }
 
@@ -448,23 +481,29 @@ export class PostgresGameStore {
       const stage = await validateChoice(tx, session.id, teamId, session.current_stage_index, progress.selected_choice_id);
       const now = new Date();
       await tx`
-        update app.team_stage_progress
-        set decision_confirmed_at = ${now}, status = ${stage.fileRequired ? "awaiting-file" : "ready"},
-            last_activity_at = ${now}, version = version + 1
-        where session_id = ${session.id} and team_id = ${teamId}
-          and stage_index = ${session.current_stage_index}
-      `;
-      await tx`
         insert into app.decisions (session_id, team_id, stage_index, stage_id, choice_id, source, confirmed_at)
         values (${session.id}, ${teamId}, ${session.current_stage_index}, ${stage.id},
                 ${progress.selected_choice_id}, ${progress.selected_source ?? "captain"}, ${now})
-        on conflict (session_id, team_id, stage_index) do update set
-          stage_id = excluded.stage_id,
+        on conflict (session_id, team_id, stage_index, stage_id) do update set
           choice_id = excluded.choice_id,
           source = excluded.source,
           confirmed_at = excluded.confirmed_at
       `;
-      await addEvent(tx, session.id, "captain", "decision.confirmed", teamId, { choiceId: progress.selected_choice_id });
+      await tx`
+        update app.team_stage_progress
+        set selected_choice_id = null,
+            selected_source = null,
+            decision_confirmed_at = null,
+            status = ${stage.fileRequired ? "awaiting-file" : "awaiting-decision"},
+            last_activity_at = ${now},
+            version = version + 1
+        where session_id = ${session.id} and team_id = ${teamId}
+          and stage_index = ${session.current_stage_index}
+      `;
+      await addEvent(tx, session.id, "captain", "decision.confirmed", teamId, {
+        stageId: stage.id,
+        choiceId: progress.selected_choice_id,
+      });
     });
   }
 
@@ -519,25 +558,58 @@ export class PostgresGameStore {
       const now = new Date();
       const fileMissing = stage.fileRequired;
       await tx`
-        update app.team_stage_progress
-        set selected_choice_id = ${choiceId}, selected_source = 'organizer_override',
-            decision_confirmed_at = ${now}, status = 'ready',
-            file_missing_on_forced_advance = ${fileMissing},
-            last_activity_at = ${now}, version = version + 1
-        where session_id = ${session.id} and team_id = ${teamId}
-          and stage_index = ${session.current_stage_index}
-      `;
-      await tx`
         insert into app.decisions (session_id, team_id, stage_index, stage_id, choice_id, source, confirmed_at)
         values (${session.id}, ${teamId}, ${session.current_stage_index}, ${stage.id},
                 ${choiceId}, 'organizer_override', ${now})
-        on conflict (session_id, team_id, stage_index) do update set
-          stage_id = excluded.stage_id,
+        on conflict (session_id, team_id, stage_index, stage_id) do update set
           choice_id = excluded.choice_id,
           source = excluded.source,
           confirmed_at = excluded.confirmed_at
       `;
-      await addEvent(tx, session.id, "organizer", "decision.forced", teamId, { choiceId, fileMissing });
+      await tx`
+        update app.team_stage_progress
+        set selected_choice_id = null,
+            selected_source = null,
+            decision_confirmed_at = null,
+            status = ${stage.fileRequired ? "ready" : "awaiting-decision"},
+            file_missing_on_forced_advance = ${fileMissing},
+            last_activity_at = ${now},
+            version = version + 1
+        where session_id = ${session.id} and team_id = ${teamId}
+          and stage_index = ${session.current_stage_index}
+      `;
+      await addEvent(tx, session.id, "organizer", "decision.forced", teamId, {
+        stageId: stage.id,
+        choiceId,
+        fileMissing,
+      });
+    });
+  }
+
+  async forceCompleteWithoutFile(teamId: string) {
+    await this.sql.begin(async (tx) => {
+      const session = await currentSession(tx, true);
+      const progress = rows<ProgressRow>(await tx`
+        select team_id, status, selected_choice_id, selected_source,
+               decision_confirmed_at, file_missing_on_forced_advance, last_activity_at
+        from app.team_stage_progress
+        where session_id = ${session.id} and team_id = ${teamId}
+          and stage_index = ${session.current_stage_index}
+        for update
+      `)[0];
+      if (!progress || progress.status !== "awaiting-file") {
+        throw new Error("Команда сейчас не ожидает файл");
+      }
+      await tx`
+        update app.team_stage_progress
+        set status = 'ready', file_missing_on_forced_advance = true,
+            last_activity_at = now(), version = version + 1
+        where session_id = ${session.id} and team_id = ${teamId}
+          and stage_index = ${session.current_stage_index}
+      `;
+      await addEvent(tx, session.id, "organizer", "stage.forced_without_file", teamId, {
+        stageIndex: session.current_stage_index,
+      });
     });
   }
 

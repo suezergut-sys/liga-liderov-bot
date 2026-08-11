@@ -60,22 +60,36 @@ export async function POST(request: NextRequest, context: { params: Promise<{ bo
     }
 
     if (update.callback_query?.data) {
-      const [action, stageRaw, choiceId] = update.callback_query.data.split(":");
+      const [action, stageRaw, stepId, choiceId] = update.callback_query.data.split(":");
       const stageIndex = Number(stageRaw);
       if (stageIndex !== team.currentStageIndex) throw new Error("Эта карточка уже неактуальна");
+      const stage = getScenarioStage(team, stageIndex);
+      if (!stage || stage.id !== stepId) throw new Error("Этот шаг уже завершён");
+      const choice = stage.choices.find((item) => item.id === choiceId);
+      if (!choice) throw new Error("Недопустимый вариант");
       if (action === "pick") {
         await gameStore.selectChoice(team.id, choiceId);
-        const stage = getScenarioStage(team, stageIndex);
-        const choice = stage.choices.find((item) => item.id === choiceId)!;
         await sendText(
           bot,
           team.captainChatId!,
           `Вы выбрали: <b>${choice.label}</b>\n\nПодтвердить решение? После подтверждения изменить его нельзя.`,
-          { inline_keyboard: [[{ text: "Подтвердить", callback_data: `confirm:${stageIndex}:${choiceId}` }]] },
+          { inline_keyboard: [[{ text: "Подтвердить", callback_data: `confirm:${stageIndex}:${stage.id}:${choiceId}` }]] },
         );
       } else if (action === "confirm") {
+        if (team.selectedChoiceId !== choiceId) throw new Error("Сначала заново выберите решение");
         await gameStore.confirmChoice(team.id);
-        await sendText(bot, team.captainChatId!, "Решение зафиксировано. Отправьте актуальный Excel-файл бюджета в формате .xlsx.");
+        const updatedTeam = await gameStore.getTeam(team.id);
+        const result = choice.result ? `\n\n${choice.result}` : "";
+        if (updatedTeam.status === "awaiting-decision") {
+          await sendText(bot, team.captainChatId!, `Решение зафиксировано.${result}`);
+          await sendCurrentStage(bot, updatedTeam);
+        } else {
+          await sendText(
+            bot,
+            team.captainChatId!,
+            `Решение зафиксировано.${result}\n\nОтправьте актуальный Excel-файл бюджета в формате .xlsx.`,
+          );
+        }
       }
       await answerCallback(bot, update.callback_query.id);
     } else if (update.message?.document) {

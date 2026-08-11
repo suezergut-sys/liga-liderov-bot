@@ -13,6 +13,7 @@ export type DecisionSource = "captain" | "organizer_override";
 export interface Choice {
   id: string;
   label: string;
+  result?: string;
 }
 
 export interface ScenarioStage {
@@ -20,6 +21,7 @@ export interface ScenarioStage {
   title: string;
   situation: string;
   choices: Choice[];
+  /** После подтверждения этого шага команда должна перейти к загрузке файла. */
   fileRequired: boolean;
 }
 

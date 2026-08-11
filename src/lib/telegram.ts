@@ -27,16 +27,41 @@ export async function sendText(bot: BotConfig, chatId: string, text: string, rep
   });
 }
 
+function hasLongChoiceLabels(labels: string[]) {
+  return labels.some((label) => label.trim().split(/\s+/).length > 2);
+}
+
 export async function sendCurrentStage(bot: BotConfig, team: TeamState) {
   if (!team.captainChatId || team.currentStageIndex < 0) return;
   const stage = getScenarioStage(team, team.currentStageIndex);
-  const buttons = stage.choices.map((choice) => [
-    { text: choice.label, callback_data: `pick:${team.currentStageIndex}:${choice.id}` },
+  if (!stage) {
+    if (team.status === "awaiting-file") {
+      await sendText(bot, team.captainChatId, "Отправьте актуальный Excel-файл бюджета в формате .xlsx.");
+    }
+    return;
+  }
+  if (stage.choices.length === 0) {
+    await sendText(
+      bot,
+      team.captainChatId,
+      `<b>${stage.title}</b>\n\n${stage.situation}\n\nОтправьте актуальный Excel-файл бюджета в формате .xlsx.`,
+    );
+    return;
+  }
+  const useNumberedChoices = hasLongChoiceLabels(stage.choices.map((choice) => choice.label));
+  const buttons = stage.choices.map((choice, index) => [
+    {
+      text: useNumberedChoices ? `Вариант ${index + 1}` : choice.label,
+      callback_data: `pick:${team.currentStageIndex}:${stage.id}:${choice.id}`,
+    },
   ]);
+  const choiceList = useNumberedChoices
+    ? `\n\n${stage.choices.map((choice, index) => `<b>Вариант ${index + 1}.</b> ${choice.label}`).join("\n\n")}`
+    : "";
   await sendText(
     bot,
     team.captainChatId,
-    `<b>${stage.title}</b>\n\n${stage.situation}\n\nВыберите решение команды:`,
+    `<b>${stage.title}</b>\n\n${stage.situation}${choiceList}\n\nВыберите решение команды:`,
     { inline_keyboard: buttons },
   );
 }

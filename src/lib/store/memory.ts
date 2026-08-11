@@ -137,6 +137,10 @@ export class MemoryGameStore {
       team.currentFileUrl = undefined;
       team.delivery = { status: "not-sent" };
       team.lastActivityAt = openedAt.toISOString();
+      const stage = getScenarioStage(team, stageIndex);
+      if (stage && stage.choices.length === 0 && stage.fileRequired) {
+        team.status = "awaiting-file";
+      }
     }
   }
 
@@ -146,24 +150,34 @@ export class MemoryGameStore {
       throw new Error("Решение уже зафиксировано или этап закрыт");
     }
     const stage = getScenarioStage(team, team.currentStageIndex);
+    if (!stage) throw new Error("В текущем этапе больше нет решений");
     if (!stage.choices.some((choice) => choice.id === choiceId)) throw new Error("Недопустимый вариант");
     team.selectedChoiceId = choiceId;
     team.selectedSource = source;
     team.status = "decision-selected";
     team.lastActivityAt = new Date().toISOString();
-    addEvent(this.data, source === "captain" ? "captain" : "organizer", "decision.selected", teamId, { choiceId });
+    addEvent(this.data, source === "captain" ? "captain" : "organizer", "decision.selected", teamId, {
+      stageId: stage.id,
+      choiceId,
+    });
   }
 
   confirmChoice(teamId: string) {
     const team = this.getTeam(teamId);
     if (team.status !== "decision-selected" || !team.selectedChoiceId) throw new Error("Сначала выберите решение");
     const stage = getScenarioStage(team, team.currentStageIndex);
+    if (!stage) throw new Error("В текущем этапе больше нет решений");
     const now = new Date().toISOString();
     team.decisionConfirmedAt = now;
-    team.status = stage.fileRequired ? "awaiting-file" : "ready";
+    this.commitDecision(team, stage, false);
+    team.status = stage.fileRequired ? "awaiting-file" : "awaiting-decision";
     team.lastActivityAt = now;
-    if (!stage.fileRequired) this.commitDecision(team, false);
-    addEvent(this.data, "captain", "decision.confirmed", teamId, { choiceId: team.selectedChoiceId });
+    addEvent(this.data, "captain", "decision.confirmed", teamId, {
+      stageId: stage.id,
+      choiceId: team.selectedChoiceId,
+    });
+    team.selectedChoiceId = undefined;
+    team.selectedSource = undefined;
   }
 
   attachFile(teamId: string, fileName: string, fileUrl: string) {
@@ -173,7 +187,12 @@ export class MemoryGameStore {
     team.currentFileUrl = fileUrl;
     team.status = "ready";
     team.lastActivityAt = new Date().toISOString();
-    this.commitDecision(team, false);
+    const decisions = team.history.filter((item) => item.stageIndex === team.currentStageIndex);
+    const finalDecision = decisions.at(-1);
+    if (finalDecision) {
+      finalDecision.fileName = fileName;
+      finalDecision.fileUrl = fileUrl;
+    }
     addEvent(this.data, "captain", "file.uploaded", teamId, { fileName });
   }
 
@@ -181,24 +200,46 @@ export class MemoryGameStore {
     const team = this.getTeam(teamId);
     if (team.status === "ready" || team.status === "completed") throw new Error("Команда уже завершила этап");
     const stage = getScenarioStage(team, team.currentStageIndex);
+    if (!stage || stage.choices.length === 0) throw new Error("В текущем шаге нет решения для принудительной фиксации");
     if (!stage.choices.some((choice) => choice.id === choiceId)) throw new Error("Недопустимый вариант");
     const now = new Date().toISOString();
     team.selectedChoiceId = choiceId;
     team.selectedSource = "organizer_override";
     team.decisionConfirmedAt = now;
-    team.status = "ready";
+    this.commitDecision(team, stage, stage.fileRequired && !team.currentFileName);
+    team.status = stage.fileRequired ? "ready" : "awaiting-decision";
     team.lastActivityAt = now;
-    this.commitDecision(team, stage.fileRequired && !team.currentFileName);
     addEvent(this.data, "organizer", "decision.forced", teamId, {
+      stageId: stage.id,
       choiceId,
       fileMissing: stage.fileRequired && !team.currentFileName,
     });
+    team.selectedChoiceId = undefined;
+    team.selectedSource = undefined;
   }
 
-  private commitDecision(team: TeamState, fileMissingOnForcedAdvance: boolean) {
+  forceCompleteWithoutFile(teamId: string) {
+    const team = this.getTeam(teamId);
+    if (team.status !== "awaiting-file") throw new Error("Команда сейчас не ожидает файл");
+    team.status = "ready";
+    team.lastActivityAt = new Date().toISOString();
+    for (const decision of team.history.filter((item) => item.stageIndex === team.currentStageIndex)) {
+      decision.fileMissingOnForcedAdvance = true;
+    }
+    addEvent(this.data, "organizer", "stage.forced_without_file", teamId, {
+      stageIndex: team.currentStageIndex,
+    });
+  }
+
+  private commitDecision(
+    team: TeamState,
+    stage: NonNullable<ReturnType<typeof getScenarioStage>>,
+    fileMissingOnForcedAdvance: boolean,
+  ) {
     if (!team.selectedChoiceId || !team.decisionConfirmedAt) return;
-    const stage = getScenarioStage(team, team.currentStageIndex);
-    const existing = team.history.find((item) => item.stageIndex === team.currentStageIndex);
+    const existing = team.history.find(
+      (item) => item.stageIndex === team.currentStageIndex && item.stageId === stage.id,
+    );
     const record = {
       stageIndex: team.currentStageIndex,
       stageId: stage.id,
