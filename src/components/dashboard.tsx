@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameSnapshot, TeamState } from "@/lib/domain/types";
-import { getFileUploadDetails, isPrivateVercelBlobUrl } from "@/lib/file-submission";
+import { getFileUploadDetails, isDownloadableFileUrl } from "@/lib/file-submission";
 import { getConfirmedChoiceLabels, getScenarioStage, scenarioLength } from "@/lib/scenario";
 import { SnapshotRequestGuard } from "@/lib/snapshot-request-guard";
 
@@ -296,7 +296,7 @@ export function Dashboard() {
                   {file ? (
                     <strong className="audit-message">
                       Команда {team?.number ?? event.teamId} загрузила файл для этапа {file.stageIndex + 1}.{" "}
-                      {isPrivateVercelBlobUrl(file.fileUrl) ? (
+                      {isDownloadableFileUrl(file.fileUrl) ? (
                         <a href={`/api/admin/files?event=${encodeURIComponent(event.id)}`}>Скачать {file.fileName}</a>
                       ) : file.fileName}
                     </strong>

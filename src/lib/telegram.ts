@@ -67,7 +67,13 @@ export async function sendCurrentStage(bot: BotConfig, team: TeamState) {
 }
 
 export async function answerCallback(bot: BotConfig, callbackQueryId: string, text?: string) {
-  return telegramCall(bot, "answerCallbackQuery", { callback_query_id: callbackQueryId, text });
+  try {
+    return await telegramCall(bot, "answerCallbackQuery", { callback_query_id: callbackQueryId, text });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/query is too old|query ID is invalid/i.test(message)) return undefined;
+    throw error;
+  }
 }
 
 interface TelegramDocument {
@@ -75,6 +81,14 @@ interface TelegramDocument {
   file_name?: string;
   mime_type?: string;
   file_size?: number;
+}
+
+export async function downloadTelegramDocument(bot: BotConfig, fileId: string) {
+  const file = await telegramCall<{ file_path?: string }>(bot, "getFile", { file_id: fileId });
+  if (!file.file_path) throw new Error("Telegram не вернул путь к файлу");
+  const response = await fetch(`${TELEGRAM_API}/file/bot${bot.token}/${file.file_path}`);
+  if (!response.ok) throw new Error("Не удалось скачать файл из Telegram");
+  return response;
 }
 
 export async function persistTelegramDocument(bot: BotConfig, teamId: string, document: TelegramDocument) {
@@ -86,10 +100,7 @@ export async function persistTelegramDocument(bot: BotConfig, teamId: string, do
     return { fileName, fileUrl: `telegram-file:${document.file_id}` };
   }
 
-  const file = await telegramCall<{ file_path?: string }>(bot, "getFile", { file_id: document.file_id });
-  if (!file.file_path) throw new Error("Telegram не вернул путь к файлу");
-  const response = await fetch(`${TELEGRAM_API}/file/bot${bot.token}/${file.file_path}`);
-  if (!response.ok) throw new Error("Не удалось скачать файл из Telegram");
+  const response = await downloadTelegramDocument(bot, document.file_id);
   const blob = await put(`submissions/${teamId}/${Date.now()}-${fileName}`, response.body!, {
     access: "private",
     contentType: document.mime_type ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

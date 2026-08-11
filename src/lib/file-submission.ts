@@ -35,3 +35,14 @@ export function isPrivateVercelBlobUrl(value: string) {
     return false;
   }
 }
+
+export function getTelegramFileId(value: string) {
+  const prefix = "telegram-file:";
+  if (!value.startsWith(prefix)) return undefined;
+  const fileId = value.slice(prefix.length);
+  return /^[A-Za-z0-9_-]{1,512}$/.test(fileId) ? fileId : undefined;
+}
+
+export function isDownloadableFileUrl(value: string) {
+  return isPrivateVercelBlobUrl(value) || Boolean(getTelegramFileId(value));
+}
