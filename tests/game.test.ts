@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { MemoryGameStore } from "@/lib/store/memory";
 
+function firstChoice(store: MemoryGameStore, teamId: string) {
+  return store.getStage(teamId)!.choices[0].id;
+}
+
 describe("MemoryGameStore", () => {
   it("blocks advance until every team is ready", () => {
     const store = new MemoryGameStore();
@@ -14,7 +18,8 @@ describe("MemoryGameStore", () => {
     expect(store.snapshot().game.durationSeconds).toBe(3 * 60);
 
     for (let number = 1; number <= 7; number += 1) {
-      store.forceResolve(`team-${number}`, "protect-margin");
+      const teamId = `team-${number}`;
+      store.forceResolve(teamId, firstChoice(store, teamId));
     }
     store.advanceGame(7 * 60);
 
@@ -31,33 +36,52 @@ describe("MemoryGameStore", () => {
   it("locks a captain decision after confirmation", () => {
     const store = new MemoryGameStore();
     store.startGame();
-    store.selectChoice("team-1", "accept-discount");
+    store.selectChoice("team-1", "urgent-hire");
     store.confirmChoice("team-1");
-    expect(() => store.selectChoice("team-1", "protect-margin")).toThrow("Решение уже зафиксировано");
+    expect(() => store.selectChoice("team-1", "use-contractors")).toThrow("Решение уже зафиксировано");
   });
 
   it("records an organizer override and missing file", () => {
     const store = new MemoryGameStore();
     store.startGame();
-    store.forceResolve("team-1", "protect-margin");
+    store.forceResolve("team-1", "use-contractors");
     const team = store.getTeam("team-1");
     expect(team.status).toBe("ready");
     expect(team.history[0]).toMatchObject({
-      choiceId: "protect-margin",
+      choiceId: "use-contractors",
       source: "organizer_override",
       fileMissingOnForcedAdvance: true,
     });
   });
 
-  it("opens the branch-specific second stage", () => {
+  it("opens color- and branch-specific second stages", () => {
     const store = new MemoryGameStore();
     store.startGame();
     for (let number = 1; number <= 7; number += 1) {
-      store.forceResolve(`team-${number}`, number === 1 ? "accept-discount" : "protect-margin");
+      const teamId = `team-${number}`;
+      const choiceId = number === 1 ? "urgent-hire" : firstChoice(store, teamId);
+      store.forceResolve(teamId, choiceId);
     }
     store.advanceGame();
-    expect(store.getStage("team-1")?.situation).toContain("маржинальность снизилась");
-    expect(store.getStage("team-2")?.situation).toContain("Переговоры затянулись");
+    expect(store.getStage("team-1")?.situation).toContain("наняли двух старших консультантов");
+    expect(store.getStage("team-5")?.situation).toContain("Проект «Шахты» продолжается");
+  });
+
+  it("runs all four final-scenario stages to completion", () => {
+    const store = new MemoryGameStore();
+    store.startGame();
+
+    for (let stageIndex = 0; stageIndex < 4; stageIndex += 1) {
+      for (let number = 1; number <= 7; number += 1) {
+        const teamId = `team-${number}`;
+        store.forceResolve(teamId, firstChoice(store, teamId));
+      }
+      store.advanceGame();
+    }
+
+    expect(store.snapshot().game.status).toBe("completed");
+    expect(store.getTeam("team-1").history).toHaveLength(4);
+    expect(store.getTeam("team-5").history).toHaveLength(4);
   });
 
   it("deduplicates Telegram updates per bot", () => {

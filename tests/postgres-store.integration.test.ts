@@ -17,28 +17,30 @@ describe.skipIf(!runIntegration)("PostgresGameStore integration", () => {
 
   it("persists a complete stage and exposes it from a new store instance", { timeout: 30_000 }, async () => {
     await store.startGame();
-    await store.selectChoice("team-1", "accept-discount");
+    await store.selectChoice("team-1", "urgent-hire");
     await store.confirmChoice("team-1");
     await store.attachFile("team-1", "budget-team-1.xlsx", "integration-file");
 
     for (let number = 2; number <= 7; number += 1) {
-      await store.forceResolve(`team-${number}`, "protect-margin");
+      const teamId = `team-${number}`;
+      const choiceId = (await store.getStage(teamId))!.choices[0].id;
+      await store.forceResolve(teamId, choiceId);
     }
 
     const persisted = await new PostgresGameStore().snapshot();
     expect(persisted.game).toMatchObject({ status: "running", currentStageIndex: 0 });
     expect(persisted.teams[0]).toMatchObject({
       status: "ready",
-      selectedChoiceId: "accept-discount",
+      selectedChoiceId: "urgent-hire",
       currentFileName: "budget-team-1.xlsx",
     });
     expect(persisted.teams[0].history[0]).toMatchObject({
-      choiceId: "accept-discount",
+      choiceId: "urgent-hire",
       source: "captain",
     });
 
     await store.advanceGame();
-    expect((await store.getStage("team-1"))?.situation).toContain("маржинальность снизилась");
+    expect((await store.getStage("team-1"))?.situation).toContain("наняли двух старших консультантов");
   });
 
   it("deduplicates concurrent Telegram updates in PostgreSQL", async () => {
