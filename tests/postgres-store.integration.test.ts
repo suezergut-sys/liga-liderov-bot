@@ -37,6 +37,14 @@ describe.skipIf(!runIntegration)("PostgresGameStore integration", () => {
       choiceId: "urgent-hire",
       source: "captain",
     });
+    expect(persisted.audit.find((event) => event.action === "file.uploaded")).toMatchObject({
+      teamId: "team-1",
+      details: {
+        fileName: "budget-team-1.xlsx",
+        fileUrl: "integration-file",
+        stageIndex: 0,
+      },
+    });
 
     await store.advanceGame();
     expect((await store.getStage("team-1"))?.id).toBe("red-q2-staffing");

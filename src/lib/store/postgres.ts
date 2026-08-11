@@ -536,7 +536,11 @@ export class PostgresGameStore {
         where session_id = ${session.id} and team_id = ${teamId}
           and stage_index = ${session.current_stage_index}
       `;
-      await addEvent(tx, session.id, "captain", "file.uploaded", teamId, { fileName });
+      await addEvent(tx, session.id, "captain", "file.uploaded", teamId, {
+        fileName,
+        fileUrl,
+        stageIndex: session.current_stage_index,
+      });
     });
   }
 

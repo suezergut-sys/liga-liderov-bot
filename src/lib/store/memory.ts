@@ -193,7 +193,11 @@ export class MemoryGameStore {
       finalDecision.fileName = fileName;
       finalDecision.fileUrl = fileUrl;
     }
-    addEvent(this.data, "captain", "file.uploaded", teamId, { fileName });
+    addEvent(this.data, "captain", "file.uploaded", teamId, {
+      fileName,
+      fileUrl,
+      stageIndex: team.currentStageIndex,
+    });
   }
 
   forceResolve(teamId: string, choiceId: string) {

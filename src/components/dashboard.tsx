@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameSnapshot, TeamState } from "@/lib/domain/types";
+import { getFileUploadDetails, isPrivateVercelBlobUrl } from "@/lib/file-submission";
 import { getConfirmedChoiceLabels, getScenarioStage, scenarioLength } from "@/lib/scenario";
 import { SnapshotRequestGuard } from "@/lib/snapshot-request-guard";
 
@@ -286,13 +287,28 @@ export function Dashboard() {
         </div>
         {snapshot.audit.length === 0 ? <p className="muted">Событий пока нет.</p> : (
           <ul className="audit-list">
-            {snapshot.audit.slice(0, 12).map((event) => (
-              <li key={event.id}>
-                <time>{new Date(event.at).toLocaleTimeString("ru-RU")}</time>
-                <span>{event.teamId ?? "Все команды"}</span>
-                <strong>{event.action}</strong>
-              </li>
-            ))}
+            {snapshot.audit.slice(0, 12).map((event) => {
+              const file = getFileUploadDetails(event);
+              const team = snapshot.teams.find((item) => item.id === event.teamId);
+              return (
+                <li key={event.id}>
+                  <time>{new Date(event.at).toLocaleTimeString("ru-RU")}</time>
+                  {file ? (
+                    <strong className="audit-message">
+                      Команда {team?.number ?? event.teamId} загрузила файл для этапа {file.stageIndex + 1}.{" "}
+                      {isPrivateVercelBlobUrl(file.fileUrl) ? (
+                        <a href={`/api/admin/files?event=${encodeURIComponent(event.id)}`}>Скачать {file.fileName}</a>
+                      ) : file.fileName}
+                    </strong>
+                  ) : (
+                    <>
+                      <span>{event.teamId ?? "Все команды"}</span>
+                      <strong>{event.action}</strong>
+                    </>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

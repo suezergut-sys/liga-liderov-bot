@@ -76,6 +76,8 @@ dd { overflow: hidden; margin: 0; font-size: 14px; font-weight: 700; text-overfl
 .audit-list { margin: 18px 0 0; padding: 0; list-style: none; }
 .audit-list li { display: grid; grid-template-columns: 90px 130px 1fr; gap: 14px; border-top: 1px solid var(--line); padding: 12px 0; font-size: 13px; }
 .audit-list time, .muted { color: var(--muted); }
+.audit-message { grid-column: 2 / -1; }
+.audit-message a { color: #1255a3; text-decoration: underline; text-underline-offset: 2px; }
 .loading, .login-shell { display: grid; place-items: center; }
 .login-card { width: min(100%, 420px); border: 1px solid var(--line); border-radius: 20px; padding: 28px; background: white; box-shadow: 0 20px 60px rgba(25, 38, 67, .12); }
 .login-card h1 { margin-bottom: 18px; font-size: 38px; }

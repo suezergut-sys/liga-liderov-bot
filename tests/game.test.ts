@@ -88,6 +88,28 @@ describe("MemoryGameStore", () => {
     });
   });
 
+  it("records the uploaded file URL and stage in the audit trail", () => {
+    const store = new MemoryGameStore();
+    store.startGame();
+    store.selectChoice("team-1", "urgent-hire");
+    store.confirmChoice("team-1");
+    store.attachFile(
+      "team-1",
+      "budget-team-1.xlsx",
+      "https://store.private.blob.vercel-storage.com/submissions/budget-team-1.xlsx",
+    );
+
+    expect(store.snapshot().audit[0]).toMatchObject({
+      action: "file.uploaded",
+      teamId: "team-1",
+      details: {
+        fileName: "budget-team-1.xlsx",
+        fileUrl: "https://store.private.blob.vercel-storage.com/submissions/budget-team-1.xlsx",
+        stageIndex: 0,
+      },
+    });
+  });
+
   it("opens color- and branch-specific second stages", () => {
     const store = new MemoryGameStore();
     store.startGame();
