@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DecisionRecord, TeamState } from "@/lib/domain/types";
-import { getScenarioStage, scenarioLength } from "@/lib/scenario";
+import {
+  expandLegacyChoiceId,
+  getConfirmedChoiceLabels,
+  getScenarioStage,
+  scenarioLength,
+} from "@/lib/scenario";
 
 type TestDecision = Pick<DecisionRecord, "stageIndex" | "stageId" | "choiceId">;
 
@@ -77,6 +82,31 @@ describe("multi-step team scenarios", () => {
     expect(bonus.id).toBe("blue-q2-seller-bonus");
     expect(bonus.choices.map((choice) => choice.label)).toEqual(["Да", "Нет"]);
     expect(bonus.fileRequired).toBe(true);
+  });
+
+  it("restores confirmed decision labels after the pending selection is cleared", () => {
+    const completedTeam = team("red", [
+      decision(0, "red-q1-yakor-modernization", "urgent-hire"),
+    ]);
+    completedTeam.status = "ready";
+    completedTeam.currentStageIndex = 0;
+    completedTeam.currentFileName = "budget.xlsx";
+
+    expect(getConfirmedChoiceLabels(completedTeam, 0)).toEqual([
+      "Срочно нанять 2 старших консультантов (+10% к зарплате)",
+    ]);
+  });
+
+  it("expands Q2 choices from an already open 0.2 admin page", () => {
+    expect(expandLegacyChoiceId("red", 1, "gamma-contractors-q3")).toEqual([
+      "use-gamma-contractors",
+      "start-yakor-q3",
+    ]);
+    expect(expandLegacyChoiceId("blue", 1, "nohire-pr-bonus")).toEqual([
+      "do-not-hire-consultants",
+      "run-pr",
+      "pay-bonus-advance",
+    ]);
   });
 
   it("keeps the approved red Q3 forecast question and yes-or-no choices", () => {
