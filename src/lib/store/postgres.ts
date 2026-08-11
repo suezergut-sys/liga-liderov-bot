@@ -169,7 +169,7 @@ function mapHistory(row: HistoryRow): DecisionRecord {
   };
 }
 
-async function validateChoice(
+export async function validateChoice(
   sql: Queryable,
   sessionId: string,
   teamId: string,
@@ -179,7 +179,14 @@ async function validateChoice(
   const history = (await historyForSession(sql, sessionId))
     .filter((row) => row.team_id === teamId)
     .map(mapHistory);
-  const stage = getScenarioStage({ history } as TeamState, stageIndex);
+  const team = rows<Pick<TeamRow, "color">>(await sql`
+    select color
+    from app.teams
+    where id = ${teamId}
+  `)[0];
+  if (!team) throw new Error("Команда не найдена");
+
+  const stage = getScenarioStage({ color: team.color, history } as TeamState, stageIndex);
   if (!stage.choices.some((choice) => choice.id === choiceId)) {
     throw new Error("Недопустимый вариант");
   }
