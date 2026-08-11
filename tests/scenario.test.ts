@@ -37,6 +37,18 @@ describe("final team scenarios", () => {
     expect(stage.choices.map((choice) => choice.id)).toContain("nohire-nopr-nobonus");
   });
 
+  it("asks the red team a yes-or-no budget forecast question in Q3", () => {
+    const stage = getScenarioStage(team("red", ["urgent-hire", "hire-q3"]), 2);
+    expect(stage.situation).toContain(
+      "Вы будете что-то менять в Прогнозе года, чтобы выполнить цели Бюджета?",
+    );
+    expect(stage.choices).toEqual([
+      { id: "keep-profit-target", label: "Да" },
+      { id: "revise-profit-target", label: "Нет" },
+    ]);
+    expect(stage.fileRequired).toBe(true);
+  });
+
   it("applies the red staffing branch to the final client situation", () => {
     const hired = getScenarioStage(team("red", ["urgent-hire", "hire-q3", "keep-profit-target"]), 3);
     const contractors = getScenarioStage(
