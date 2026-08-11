@@ -1,4 +1,4 @@
-import type { Choice, ScenarioStage, TeamState } from "@/lib/domain/types";
+import type { Choice, ScenarioStage, TeamColor, TeamState } from "@/lib/domain/types";
 
 export const scenarioLength = 4;
 
@@ -229,4 +229,48 @@ function blueStage(team: TeamState, stageIndex: number): ScenarioStage | undefin
 
 export function getScenarioStage(team: TeamState, stageIndex: number): ScenarioStage | undefined {
   return team.color === "red" ? redStage(team, stageIndex) : blueStage(team, stageIndex);
+}
+
+export function getConfirmedChoiceLabels(team: TeamState, stageIndex: number): string[] {
+  const replayTeam: TeamState = { ...team, history: [] };
+  const labels: string[] = [];
+
+  for (const decision of team.history) {
+    if (decision.stageIndex === stageIndex) {
+      const stage = getScenarioStage(replayTeam, stageIndex);
+      const choice = stage?.id === decision.stageId
+        ? stage.choices.find((item) => item.id === decision.choiceId)
+        : undefined;
+      if (choice) labels.push(choice.label);
+    }
+    replayTeam.history.push(decision);
+  }
+
+  return labels;
+}
+
+export function expandLegacyChoiceId(
+  color: TeamColor,
+  stageIndex: number,
+  choiceId: string,
+): string[] | undefined {
+  if (stageIndex !== 1) return undefined;
+
+  if (color === "red") {
+    const choices: Record<string, string[]> = {
+      "hire-now": ["hire-two-consultants", "start-yakor-now"],
+      "hire-q3": ["hire-two-consultants", "start-yakor-q3"],
+      "gamma-contractors-now": ["use-gamma-contractors", "start-yakor-now"],
+      "gamma-contractors-q3": ["use-gamma-contractors", "start-yakor-q3"],
+    };
+    return choices[choiceId];
+  }
+
+  const match = /^(hire|nohire)-(pr|nopr)-(bonus|nobonus)$/.exec(choiceId);
+  if (!match) return undefined;
+  return [
+    match[1] === "hire" ? "hire-consultants" : "do-not-hire-consultants",
+    match[2] === "pr" ? "run-pr" : "skip-pr",
+    match[3] === "bonus" ? "pay-bonus-advance" : "decline-bonus-advance",
+  ];
 }

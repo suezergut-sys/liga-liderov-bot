@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameSnapshot, TeamState } from "@/lib/domain/types";
-import { getScenarioStage, scenarioLength } from "@/lib/scenario";
+import { getConfirmedChoiceLabels, getScenarioStage, scenarioLength } from "@/lib/scenario";
+import { SnapshotRequestGuard } from "@/lib/snapshot-request-guard";
 
 const statusLabels: Record<TeamState["status"], string> = {
   waiting: "Ожидает старта",
@@ -30,9 +31,13 @@ export function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [stageDurationMinutes, setStageDurationMinutes] = useState(10);
   const durationInitialized = useRef(false);
+  const snapshotRequests = useRef(new SnapshotRequestGuard());
 
   const load = useCallback(async () => {
+    const requestId = snapshotRequests.current.beginRead();
+    if (requestId === undefined) return;
     const response = await fetch("/api/dashboard", { cache: "no-store" });
+    if (!snapshotRequests.current.isCurrent(requestId)) return;
     if (response.status === 401) {
       setNeedsLogin(true);
       return;
@@ -63,6 +68,7 @@ export function Dashboard() {
   }, [snapshot]);
 
   async function action(body: Record<string, unknown>) {
+    const requestId = snapshotRequests.current.beginMutation();
     setBusy(true);
     setError(undefined);
     try {
@@ -73,10 +79,11 @@ export function Dashboard() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Действие не выполнено");
-      setSnapshot(result as GameSnapshot);
+      if (snapshotRequests.current.isCurrent(requestId)) setSnapshot(result as GameSnapshot);
     } catch (value) {
       setError(value instanceof Error ? value.message : "Неизвестная ошибка");
     } finally {
+      snapshotRequests.current.endMutation(requestId);
       setBusy(false);
     }
   }
@@ -199,7 +206,10 @@ export function Dashboard() {
               {teams.map((team) => {
                 const stage = team.currentStageIndex >= 0 ? getScenarioStage(team, team.currentStageIndex) : undefined;
                 const selectedChoiceLabel = stage?.choices.find((choice) => choice.id === team.selectedChoiceId)?.label;
-                const confirmedStepCount = team.history.filter((decision) => decision.stageIndex === team.currentStageIndex).length;
+                const confirmedChoiceLabels = getConfirmedChoiceLabels(team, team.currentStageIndex);
+                const displayedChoiceLabels = selectedChoiceLabel
+                  ? [...confirmedChoiceLabels, selectedChoiceLabel]
+                  : confirmedChoiceLabels;
                 return (
                   <article className={`team-card ${team.color}`} key={team.id}>
               <div className="team-head">
@@ -211,9 +221,9 @@ export function Dashboard() {
 
               <dl>
                 <div className={team.captainTelegramUserId ? "complete" : undefined}><dt>Капитан</dt><dd>{team.captainTelegramUserId ? "Подключён" : "Не подключён"}</dd></div>
-                <div className={confirmedStepCount > 0 || team.selectedChoiceId ? "complete" : undefined}>
+                <div className={displayedChoiceLabels.length > 0 ? "complete" : undefined}>
                   <dt>Решения</dt>
-                  <dd>{selectedChoiceLabel ?? (confirmedStepCount > 0 ? `Подтверждено: ${confirmedStepCount}` : "—")}</dd>
+                  <dd>{displayedChoiceLabels.length > 0 ? displayedChoiceLabels.join(" → ") : "—"}</dd>
                 </div>
                 <div className={team.currentFileName ? "complete" : undefined}><dt>Файл</dt><dd>{team.currentFileName ?? "—"}</dd></div>
                 <div className={team.delivery.status === "sent" ? "complete" : undefined}>

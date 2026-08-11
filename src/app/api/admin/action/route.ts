@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminRequest } from "@/lib/auth";
 import { getBotConfig } from "@/lib/config";
-import { getScenarioStage } from "@/lib/scenario";
+import { expandLegacyChoiceId, getScenarioStage } from "@/lib/scenario";
 import { gameStore } from "@/lib/store";
 import { sendCurrentStage } from "@/lib/telegram";
 
@@ -40,6 +40,24 @@ async function deliver(teamId?: string) {
   );
 }
 
+async function forceCompatibleChoice(teamId: string, choiceId: string) {
+  let team = await gameStore.getTeam(teamId);
+  const choiceIds = expandLegacyChoiceId(team.color, team.currentStageIndex, choiceId) ?? [choiceId];
+
+  for (const compatibleChoiceId of choiceIds) {
+    team = await gameStore.getTeam(teamId);
+    const stage = getScenarioStage(team, team.currentStageIndex);
+    if (stage?.choices.some((choice) => choice.id === compatibleChoiceId)) {
+      await gameStore.forceResolve(teamId, compatibleChoiceId);
+      continue;
+    }
+    const alreadyRecorded = team.history.some(
+      (decision) => decision.stageIndex === team.currentStageIndex && decision.choiceId === compatibleChoiceId,
+    );
+    if (!alreadyRecorded) throw new Error("Недопустимый вариант");
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isAdminRequest(request)) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
   const parsed = actionSchema.safeParse(await request.json().catch(() => null));
@@ -60,7 +78,7 @@ export async function POST(request: NextRequest) {
         await gameStore.reset();
         break;
       case "force":
-        await gameStore.forceResolve(action.teamId, action.choiceId);
+        await forceCompatibleChoice(action.teamId, action.choiceId);
         break;
       case "force-complete-without-file":
         await gameStore.forceCompleteWithoutFile(action.teamId);

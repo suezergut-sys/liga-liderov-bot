@@ -54,6 +54,28 @@ describe("HTTP API integration", () => {
     });
   });
 
+  it("accepts a legacy combined Q2 organizer choice as separate audited steps", async () => {
+    await gameStore.startGame();
+    for (let number = 1; number <= 7; number += 1) {
+      await gameStore.forceResolve(`team-${number}`, number <= 4 ? "urgent-hire" : "discount-start");
+    }
+    await gameStore.advanceGame();
+
+    const response = await adminAction(jsonRequest("http://localhost/api/admin/action", {
+      type: "force",
+      teamId: "team-2",
+      choiceId: "gamma-contractors-q3",
+    }));
+    expect(response.status).toBe(200);
+    const snapshot = await response.json();
+    const team = snapshot.teams.find((item: { id: string }) => item.id === "team-2");
+    expect(team.status).toBe("ready");
+    expect(team.history.filter((item: { stageIndex: number }) => item.stageIndex === 1)).toMatchObject([
+      { stageId: "red-q2-staffing", choiceId: "use-gamma-contractors", source: "organizer_override" },
+      { stageId: "red-q2-yakor-start", choiceId: "start-yakor-q3", source: "organizer_override" },
+    ]);
+  });
+
   it("rejects malformed and unauthenticated admin commands", async () => {
     const malformed = await adminAction(jsonRequest("http://localhost/api/admin/action", { type: "unknown" }));
     expect(malformed.status).toBe(400);
