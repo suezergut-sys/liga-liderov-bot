@@ -254,6 +254,14 @@ export function expandLegacyChoiceId(
   stageIndex: number,
   choiceId: string,
 ): string[] | undefined {
+  if (color === "red" && stageIndex === 2) {
+    const choices: Record<string, string[]> = {
+      "keep-profit-target": ["change-forecast"],
+      "revise-profit-target": ["keep-forecast"],
+    };
+    return choices[choiceId];
+  }
+
   if (stageIndex !== 1) return undefined;
 
   if (color === "red") {

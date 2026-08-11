@@ -76,6 +76,39 @@ describe("HTTP API integration", () => {
     ]);
   });
 
+  it("accepts the legacy red Q3 yes-or-no choice from an already open admin page", async () => {
+    await gameStore.startGame();
+    for (let number = 1; number <= 7; number += 1) {
+      await gameStore.forceResolve(`team-${number}`, number <= 4 ? "urgent-hire" : "discount-start");
+    }
+    await gameStore.advanceGame();
+
+    for (let number = 1; number <= 4; number += 1) {
+      await gameStore.forceResolve(`team-${number}`, "use-gamma-contractors");
+      await gameStore.forceResolve(`team-${number}`, "start-yakor-q3");
+    }
+    for (let number = 5; number <= 7; number += 1) {
+      await gameStore.forceResolve(`team-${number}`, "do-not-hire-consultants");
+      await gameStore.forceResolve(`team-${number}`, "skip-pr");
+      await gameStore.forceResolve(`team-${number}`, "decline-bonus-advance");
+    }
+    await gameStore.advanceGame();
+
+    const response = await adminAction(jsonRequest("http://localhost/api/admin/action", {
+      type: "force",
+      teamId: "team-2",
+      choiceId: "keep-profit-target",
+    }));
+
+    expect(response.status).toBe(200);
+    const snapshot = await response.json();
+    const team = snapshot.teams.find((item: { id: string }) => item.id === "team-2");
+    expect(team).toMatchObject({ status: "ready" });
+    expect(team.history.filter((item: { stageIndex: number }) => item.stageIndex === 2)).toMatchObject([
+      { stageId: "red-q3-profit-target", choiceId: "change-forecast", source: "organizer_override" },
+    ]);
+  });
+
   it("rejects malformed and unauthenticated admin commands", async () => {
     const malformed = await adminAction(jsonRequest("http://localhost/api/admin/action", { type: "unknown" }));
     expect(malformed.status).toBe(400);

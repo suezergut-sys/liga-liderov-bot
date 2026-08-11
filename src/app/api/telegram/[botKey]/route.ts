@@ -60,6 +60,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ bo
     }
 
     if (update.callback_query?.data) {
+      await answerCallback(bot, update.callback_query.id);
       const [action, stageRaw, stepId, choiceId] = update.callback_query.data.split(":");
       const stageIndex = Number(stageRaw);
       if (stageIndex !== team.currentStageIndex) throw new Error("Эта карточка уже неактуальна");
@@ -91,7 +92,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ bo
           );
         }
       }
-      await answerCallback(bot, update.callback_query.id);
     } else if (update.message?.document) {
       const stored = await persistTelegramDocument(bot, team.id, update.message.document);
       await gameStore.attachFile(team.id, stored.fileName, stored.fileUrl);

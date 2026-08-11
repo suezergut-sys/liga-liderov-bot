@@ -97,7 +97,7 @@ describe("multi-step team scenarios", () => {
     ]);
   });
 
-  it("expands Q2 choices from an already open 0.2 admin page", () => {
+  it("expands choices from an already open 0.2 admin page", () => {
     expect(expandLegacyChoiceId("red", 1, "gamma-contractors-q3")).toEqual([
       "use-gamma-contractors",
       "start-yakor-q3",
@@ -106,6 +106,12 @@ describe("multi-step team scenarios", () => {
       "do-not-hire-consultants",
       "run-pr",
       "pay-bonus-advance",
+    ]);
+    expect(expandLegacyChoiceId("red", 2, "keep-profit-target")).toEqual([
+      "change-forecast",
+    ]);
+    expect(expandLegacyChoiceId("red", 2, "revise-profit-target")).toEqual([
+      "keep-forecast",
     ]);
   });
 
