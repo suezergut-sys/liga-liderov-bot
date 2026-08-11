@@ -12,7 +12,7 @@
 - Required migrations:
   - `supabase/migrations/20260810_000001_initial_game_schema.sql` — применена;
   - `supabase/migrations/20260811_000002_final_team_scenarios.sql` — применена;
-  - `supabase/migrations/20260811_000003_multistep_scenarios.sql` — требуется перед выпуском версии 0.3.0; в production пока не применена.
+  - `supabase/migrations/20260811_000003_multistep_scenarios.sql` — применена в production 2026-08-11 перед выпуском версии 0.3.0.
 - Scheduled jobs: нет
 - Required environment variables: `DATABASE_URL`, `ADMIN_PASSWORD`, `SESSION_SECRET`
 - Optional environment variables: `DIRECT_URL`, `BLOB_READ_WRITE_TOKEN`, `TELEGRAM_BOT_1_*` … `TELEGRAM_BOT_7_*`
