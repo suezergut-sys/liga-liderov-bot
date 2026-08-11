@@ -31,7 +31,6 @@ describe.skipIf(!runIntegration)("PostgresGameStore integration", () => {
     expect(persisted.game).toMatchObject({ status: "running", currentStageIndex: 0 });
     expect(persisted.teams[0]).toMatchObject({
       status: "ready",
-      selectedChoiceId: "urgent-hire",
       currentFileName: "budget-team-1.xlsx",
     });
     expect(persisted.teams[0].history[0]).toMatchObject({
@@ -40,7 +39,7 @@ describe.skipIf(!runIntegration)("PostgresGameStore integration", () => {
     });
 
     await store.advanceGame();
-    expect((await store.getStage("team-1"))?.situation).toContain("наняли двух старших консультантов");
+    expect((await store.getStage("team-1"))?.id).toBe("red-q2-staffing");
   });
 
   it("deduplicates concurrent Telegram updates in PostgreSQL", async () => {

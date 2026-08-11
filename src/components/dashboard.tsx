@@ -199,6 +199,7 @@ export function Dashboard() {
               {teams.map((team) => {
                 const stage = team.currentStageIndex >= 0 ? getScenarioStage(team, team.currentStageIndex) : undefined;
                 const selectedChoiceLabel = stage?.choices.find((choice) => choice.id === team.selectedChoiceId)?.label;
+                const confirmedStepCount = team.history.filter((decision) => decision.stageIndex === team.currentStageIndex).length;
                 return (
                   <article className={`team-card ${team.color}`} key={team.id}>
               <div className="team-head">
@@ -210,7 +211,10 @@ export function Dashboard() {
 
               <dl>
                 <div className={team.captainTelegramUserId ? "complete" : undefined}><dt>Капитан</dt><dd>{team.captainTelegramUserId ? "Подключён" : "Не подключён"}</dd></div>
-                <div className={team.selectedChoiceId ? "complete" : undefined}><dt>Решение</dt><dd>{selectedChoiceLabel ?? team.selectedChoiceId ?? "—"}</dd></div>
+                <div className={confirmedStepCount > 0 || team.selectedChoiceId ? "complete" : undefined}>
+                  <dt>Решения</dt>
+                  <dd>{selectedChoiceLabel ?? (confirmedStepCount > 0 ? `Подтверждено: ${confirmedStepCount}` : "—")}</dd>
+                </div>
                 <div className={team.currentFileName ? "complete" : undefined}><dt>Файл</dt><dd>{team.currentFileName ?? "—"}</dd></div>
                 <div className={team.delivery.status === "sent" ? "complete" : undefined}>
                   <dt>Доставка</dt>
@@ -220,13 +224,13 @@ export function Dashboard() {
                 </div>
               </dl>
 
-              {snapshot.game.status === "running" && team.captainChatId && (
+              {snapshot.game.status === "running" && team.captainChatId && team.status !== "ready" && team.status !== "completed" && (
                 <button disabled={busy} onClick={() => action({ type: "resend", teamId: team.id })}>
-                  Повторить отправку этапа
+                  Повторить текущее сообщение
                 </button>
               )}
 
-              {stage && team.status !== "ready" && team.status !== "completed" && (
+              {stage && stage.choices.length > 0 && team.status !== "ready" && team.status !== "completed" && (
                 <div className="override">
                   <span>Решение организатора</span>
                   <div className="choice-row">
@@ -239,10 +243,19 @@ export function Dashboard() {
                 </div>
               )}
 
-              {snapshot.demoMode && stage && team.status !== "ready" && team.status !== "completed" && (
+              {team.status === "awaiting-file" && (
+                <div className="override">
+                  <span>Решение организатора</span>
+                  <button disabled={busy} onClick={() => action({ type: "force-complete-without-file", teamId: team.id })}>
+                    Завершить этап без файла
+                  </button>
+                </div>
+              )}
+
+              {snapshot.demoMode && team.status !== "ready" && team.status !== "completed" && (
                 <div className="demo-tools">
                   <span>Симуляция капитана</span>
-                  {team.status === "awaiting-decision" && (
+                  {team.status === "awaiting-decision" && stage && stage.choices.length > 0 && (
                     <button onClick={() => action({ type: "demo-select", teamId: team.id, choiceId: stage.choices[0].id })}>Выбрать первый вариант</button>
                   )}
                   {team.status === "decision-selected" && <button onClick={() => action({ type: "demo-confirm", teamId: team.id })}>Подтвердить</button>}
