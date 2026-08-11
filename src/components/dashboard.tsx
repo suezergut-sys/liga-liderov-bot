@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameSnapshot, TeamState } from "@/lib/domain/types";
-import { getScenarioStage } from "@/lib/scenario";
+import { getScenarioStage, scenarioLength } from "@/lib/scenario";
 
 const statusLabels: Record<TeamState["status"], string> = {
   waiting: "Ожидает старта",
@@ -104,8 +104,8 @@ export function Dashboard() {
 
   const stageLabel = useMemo(() => {
     if (!snapshot || snapshot.game.currentStageIndex < 0) return "Игра не начата";
-    if (snapshot.game.status === "completed") return "Прототип завершён";
-    return `Этап ${snapshot.game.currentStageIndex + 1} из 2`;
+    if (snapshot.game.status === "completed") return "Игра завершена";
+    return `Этап ${snapshot.game.currentStageIndex + 1} из ${scenarioLength}`;
   }, [snapshot]);
 
   if (needsLogin) {
@@ -198,6 +198,7 @@ export function Dashboard() {
               </div>
               {teams.map((team) => {
                 const stage = team.currentStageIndex >= 0 ? getScenarioStage(team, team.currentStageIndex) : undefined;
+                const selectedChoiceLabel = stage?.choices.find((choice) => choice.id === team.selectedChoiceId)?.label;
                 return (
                   <article className={`team-card ${team.color}`} key={team.id}>
               <div className="team-head">
@@ -209,7 +210,7 @@ export function Dashboard() {
 
               <dl>
                 <div className={team.captainTelegramUserId ? "complete" : undefined}><dt>Капитан</dt><dd>{team.captainTelegramUserId ? "Подключён" : "Не подключён"}</dd></div>
-                <div className={team.selectedChoiceId ? "complete" : undefined}><dt>Решение</dt><dd>{team.selectedChoiceId ?? "—"}</dd></div>
+                <div className={team.selectedChoiceId ? "complete" : undefined}><dt>Решение</dt><dd>{selectedChoiceLabel ?? team.selectedChoiceId ?? "—"}</dd></div>
                 <div className={team.currentFileName ? "complete" : undefined}><dt>Файл</dt><dd>{team.currentFileName ?? "—"}</dd></div>
                 <div className={team.delivery.status === "sent" ? "complete" : undefined}>
                   <dt>Доставка</dt>
